@@ -145,3 +145,86 @@ ROM_filename = list(ROMs.keys())[ROM_index]
 ROM_FPS = list(ROMs.values())[ROM_index]
 
 FPS = ROM_FPS
+
+
+
+
+
+
+class chup8CPU(object):
+    def __init__(self):
+        self.fontset = [0xF0, 0x90, 0x90, 0x90, 0xF0,
+                        0x20, 0x60, 0x20, 0x20, 0x70,
+                        0xF0, 0x10, 0xF0, 0x80, 0xF0,
+                        0xF0, 0x10, 0xF0, 0x10, 0xF0,
+                        0x90, 0x90, 0xF0, 0x10, 0x10,
+                        0xF0, 0x80, 0xF0, 0x10, 0xF0,
+                        0xF0, 0x80, 0xF0, 0x90, 0xF0,
+                        0xF0, 0x10, 0x20, 0x40, 0x40,
+                        0xF0, 0x90, 0xF0, 0x90, 0xF0,
+                        0xF0, 0x90, 0xF0, 0x10, 0xF0,
+                        0xF0, 0x90, 0xF0, 0x90, 0x90,
+                        0xE0, 0x90, 0xE0, 0x90, 0xE0,
+                        0xF0, 0x80, 0x80, 0x80, 0xF0,
+                        0xE0, 0x90, 0x90, 0x90, 0xE0,
+                        0xF0, 0x80, 0xF0, 0x80, 0xF0,
+                        0xF0, 0x80, 0xF0, 0x80, 0x80]
+
+    def initialise(self):
+        logger.warn('chip8 CPU initialize')
+
+        seed()
+
+        self.SP = 0
+
+        self.stack = [0]*16
+
+        self.opcode = 0
+
+        self.opc_mnemo = ''
+
+        self.opcode_asm = ['']*6
+
+        self.memory = bytearray([0] * 4096)
+
+        self.PC = 0x200
+
+        self.I = 0
+
+        self.V = bytearray([0] * 16)
+
+        self.VRAM = bytearray([0] * 4096)
+
+        self.KBOARD = [0]*16
+
+
+        self.t_last = time()
+
+        self.memory[:80] = bytearray(self.fontset)
+
+        logger.warn('chip8 CPU Fonts Loaded...')
+
+
+        self.time = 0
+
+        self.tone = 0
+
+        self.draw_flag = False
+
+        self.ROMloaded = ''
+        self.cycle_num = 0
+
+    def ROMload(self, filename=''):    
+        logger.warn('chip8 CPU ROM REGISTERS set...')
+
+        fhand = open(filename, 'rb')
+        ROMfile = fhand.read()
+        
+        self.PC = 0x200
+
+        self.memory[self.PC: len(ROMfile)] = bytearray(ROMfile)
+
+        fhand.close()
+        logger.warn('Done')
+
+        self.ROMloaded = filename.split('/')[1]
