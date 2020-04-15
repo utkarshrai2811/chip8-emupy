@@ -6,7 +6,7 @@ from pprint import pprint
 import collections
 
 
-from pygame.locals import *
+import pygame.locals
 import colorama             
 
 colorama.init()
