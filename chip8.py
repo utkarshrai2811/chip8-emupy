@@ -14,10 +14,11 @@ import winsound
 Freq = 3500
 Dur = 20
 
-import sysprint("Native byteorder: ", sys.byteorder)
+import sys
+print("Native byteorder: ", sys.byteorder)
 
 import logging
-logging.basicConfig(level-logging.DEBUG, format='%(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s - %(message)s')
 
 logger = logging.getLogger()
 
@@ -63,7 +64,7 @@ screen_status_h = 96
 
 app_display_width = display_width * screen_scale
 app_display_height = display_height * screen_scale + screen_status_h
-app+display_pixels_count = app_display_width * app_display_height
+app_display_pixels_count = app_display_width * app_display_height
 
 app_display_size = (app_display_width, app_display_height)
 app_screen = pygame.display.set_mode(app_display_size)
