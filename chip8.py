@@ -137,7 +137,8 @@ key_down = 0
 
 ROMs = collections.OrderedDict([
     ("ROMs/pong2.ch8", 500),
-    ("ROMs/spaceInvaders.ch8", 500) ])
+    ("ROMs/spaceInvaders.ch8", 500),
+    ("ROMs/bowling.ch8", 200)])
 
 
 ROM_index = 0
