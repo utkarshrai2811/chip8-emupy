@@ -351,7 +351,7 @@ class chup8CPU(object):
 
 
         if TEST_VRAM or CONSOLE_DEBUG_SCREEN or CONSOLE_DEBUG_MSG:
-            print self
+            print(self)
 
         self.PC += 2
     
@@ -827,7 +827,7 @@ class chup8CPU(object):
 #                         self.V[0xF] = 1
 #                         self.VRAM[ X + x_line + (Y + y_line) * 64 ] ^= 1
 
-                #print X, Y
+                #print(X, Y)
 
         self.draw_flag = True
 
