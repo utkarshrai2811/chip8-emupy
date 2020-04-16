@@ -228,3 +228,111 @@ class chup8CPU(object):
         logger.warn('Done')
 
         self.ROMloaded = filename.split('/')[1]
+
+
+    def __str__(self):
+        if CONSOLE_DEBUG_SCREEN:
+            response = "\n*** chip8CPU object state: REGISTERS *** PLRANG *** \n\n\t"
+            response += "STACK: \t\t" + str(repr(self.stack)) + "\n\n\t"
+            response += "OPCOD: \t\t" + \
+                str(hex(self.opcode)) + "\t" + str(self.opcode) + \
+                '\t' + self.opcode_asm[0] + "\n\t"
+            response += "DISASM HIST: \t\t\t" + self.opcode_asm[1] + "\n\t"
+            response += "DISASM HIST: \t\t\t" + self.opcode_asm[2] + "\n\t"
+            response += "DISASM HIST: \t\t\t" + self.opcode_asm[3] + "\n\t"
+            response += "DISASM HIST: \t\t\t" + self.opcode_asm[4] + "\n\n\t"
+
+            mp = ''
+            for i in range(len(self.memory[0x200: 0x200+30])):
+                tmp += format(self.memory[0x200+i], '02x') + ' '
+
+            response += "MEM: \t\t" + str(tmp) + "\n\t"
+
+            response += "PC: \t\t" + str(self.PC) + "\n\t"
+            response += "I: \t\t" + str(self.I) + "\n\t"
+            response += "SP: \t\t" + str(self.SP) + "\n\t"
+
+            tmp = ''
+            for i in range(len(self.V)):
+                tmp += format(self.V[i], '02x') + ' '
+
+            response += "V: \t\t" + \
+                str(tmp) + ' len:' + str(len(self.V)) + "\n\t"
+
+            response += "KEY: \t\t" + str(key_down) + "\n\t"
+
+            if key_down in KEY_MAP:
+                response += "KEY E: \t\t" + str(KEY_MAP[key_down]) + "\n\t"
+
+
+
+            tmp = ''
+            for i in range(len(self.VRAM[0:30])):
+                tmp += format(self.VRAM[0+i], '02x') + ' '
+
+            response += "VRAM: \t\t" + str(tmp) + "\n\t"
+
+            response += "KB_BUF: \t" + str(repr(self.KBOARD)) + "\n\t"
+            response += "FONTS: \t\t" + "pass" + "\n\t"
+            response += "TIME: \t\t" + str(self.time) + "\n\t"
+            response += "TONE: \t\t" + str(self.tone) + "\n\t"
+
+            response += "\n*** chip8CPU object state: OTHER ***\n\n\t"
+            response += "Python time: " + str(self.t_last) + "\n\t"
+            response += "Draw flag: " + str(self.draw_flag) + "\t\t"
+            response += "ROM loaded: " + self.ROMloaded + "\t\t"
+            response += "Cycle num: \t" + \
+                str(self.cycle_num) + "\t" + "FPS: " + str(FPS)
+        else:
+            response = ''
+
+
+        if TEST_VRAM:
+            response = ''
+            count_w = 1
+            vram_len = 0
+            line_store = ''
+
+            print("\033[1;1f]")
+
+
+
+            for pixel in self.VRAM:
+                if not pixel:
+                    pixOff = ' ' * screen_scale
+                    response += pixOff
+                    line_store += pixOff
+                else:
+                    pixOn = chr(219) * screen_scale
+                    response += pixOn
+                    line_store += pixOn
+
+
+                if count_w * screen_scale % app_display_width == 0:
+                    response += '\n'
+                    line_store += '\n'
+                    line_store = line_store * (screen_scale-1)
+
+                    response += line_store
+                    count_w = 0
+
+                    line_store = ''
+
+                
+
+                count_w += 1
+                vram_len += 1
+
+                if vram_len > display_width * display_height:
+                    vram_len = 0
+                    break
+
+        if CONSOLE_DEBUG_MSG:
+            response = ' OP:' + str(hex(self.opcode)) + ' : ' + self.opc_mnemo
+
+        return response
+
+    
+    def RUNcycle(self):
+        self.cycle_num +=1
+
