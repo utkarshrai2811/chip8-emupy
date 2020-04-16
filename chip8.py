@@ -151,7 +151,7 @@ FPS = ROM_FPS
 
 
 
-class chup8CPU(object):
+class chip8CPU(object):
     def __init__(self):
         self.fontset = [0xF0, 0x90, 0x90, 0x90, 0xF0,
                         0x20, 0x60, 0x20, 0x20, 0x70,
@@ -928,9 +928,9 @@ class chup8CPU(object):
         X = self.X
         VX = self.V[X]
 
-        self.memory[self.I & 0xFFF] = ((VX / 100) % 10) & 0xFF
-        self.memory[(self.I + 1) & 0xFFF] = ((VX / 10) % 10) & 0xFF
-        self.memory[(self.I + 2) & 0xFFF] = ((VX / 1) % 10) & 0xFF
+        self.memory[self.I & 0xFFF] = int(((VX / 100) % 10)) & 0xFF
+        self.memory[(self.I + 1) & 0xFFF] = int(((VX / 10) % 10)) & 0xFF
+        self.memory[(self.I + 2) & 0xFFF] = int(((VX / 1) % 10)) & 0xFF
 
         self.opc_mnemo = "LD B, V" + str(X) + ' (' + (str(hex(VX))) + ')'
 
@@ -957,3 +957,110 @@ class chup8CPU(object):
 
         for i in range(X + 1):
             self.V[i] = self.memory[(self.I + i) & 0xFFF]
+
+
+chip8CPU = chip8CPU()
+
+chip8CPU.initialise()
+
+ROM_filename = "ROMs_test/pong2.ch8"
+
+chip8CPU.ROMload(ROM_filename)
+
+logger.warn('chip8 CPU start...')
+
+winsound.Beep(Freq, Dur)
+print("\033[2J\033[1;1f")
+pxarray[:, :] = CLS_BG
+
+
+done = False
+status_printing = True
+
+
+def status_print():
+    global status_printing
+
+    font = pygame.font.SysFont('Small Fonts', 28, False, False)
+
+    if FPS == 0:
+        text = font.render("Clock: " + "unlimited", True, COL_FG)
+    else:
+        text = font.render("Clock: " + str(FPS), True, COL_FG)
+
+    if PYGAME_DISPLAY:
+        app_screen.blit(text, [8, app_display_height - 60])
+
+        text = font.render("ROM up / dn: " + chip8CPU.ROMloaded, True, COL_FG)
+        app_screen.blit(text, [180, app_display_height - 60])
+        status_printing = False
+
+while not done:
+    if CONSOLE_CLS:
+        print("\033[2J\033[1;1f")
+
+    if PYGAME_DISPLAY:
+        pxarray = pygame.PixelArray(app_screen)
+
+    for event in pygame.event.get(): 
+        if event.type == pygame.QUIT: 
+            done = True  
+
+
+        if event.type == pygame.KEYDOWN:
+            key_down = event.key
+            if key_down in KEY_MAP:
+                chip8CPU.KBOARD[KEY_MAP[key_down]] = 1
+            if key_down == pygame.K_ESCAPE:
+                quit()
+
+            if key_down == pygame.K_UP:
+                ROM_index += 1
+                if ROM_index > len(ROMs) - 1:
+                    ROM_index = 0
+            
+            if key_down == pygame.K_DOWN:
+                ROM_index -= 1
+                if ROM_index < 0:
+                    ROM_index = len(ROMs) - 1
+
+            if key_down == pygame.K_DOWN or key_down == pygame.K_UP:
+
+                print("\033[2J\033[1;1f")   
+
+                if PYGAME_DISPLAY:
+                    pxarray[:, :] = CLS_BG     
+
+                ROM_filename = ROMs.keys()[ROM_index]
+                ROM_FPS = ROMs.values()[ROM_index]
+                FPS = ROM_FPS
+
+                chip8CPU.initialize()
+                chip8CPU.ROMload(ROM_filename)
+                status_printing = True
+
+        
+        else:
+            chip8CPU.KBOARD = [0]*16
+            key_down = False
+
+
+
+    chip8CPU.RUNcycle()
+
+    if FPS:
+        clock.tick(FPS)
+
+    if PYGAME_DISPLAY:
+        del pxarray
+
+    if status_printing:
+        status_print()
+
+    if PYGAME_DISPLAY:
+        pygame.display.update()
+
+
+pygame.quit()\
+
+exit()
