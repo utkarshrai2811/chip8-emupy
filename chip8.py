@@ -963,7 +963,7 @@ chip8CPU = chip8CPU()
 
 chip8CPU.initialise()
 
-ROM_filename = "ROMs_test/pong2.ch8"
+#ROM_filename = "ROMs/spaceInvaders.ch8"
 
 chip8CPU.ROMload(ROM_filename)
 
@@ -1031,11 +1031,11 @@ while not done:
                 if PYGAME_DISPLAY:
                     pxarray[:, :] = CLS_BG     
 
-                ROM_filename = ROMs.keys()[ROM_index]
-                ROM_FPS = ROMs.values()[ROM_index]
+                ROM_filename = list(ROMs.keys())[ROM_index]
+                ROM_FPS = list(ROMs.values())[ROM_index]
                 FPS = ROM_FPS
 
-                chip8CPU.initialize()
+                chip8CPU.initialise()
                 chip8CPU.ROMload(ROM_filename)
                 status_printing = True
 
