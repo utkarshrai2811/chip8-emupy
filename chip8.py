@@ -461,9 +461,9 @@ class chup8CPU(object):
             # Fx65        Fills V0 to VX (including VX) with values from memory starting at address I
             #             fill V0 to VX with contents of mem[I]+
 
-            0xF065: self.
-
-        }
+            0xF065: self.op_LD_VX_i
+            
+            }
 
         op_test = self.opcode & 0xF000
 
