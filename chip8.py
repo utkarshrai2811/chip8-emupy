@@ -336,3 +336,624 @@ class chup8CPU(object):
     def RUNcycle(self):
         self.cycle_num +=1
 
+        asm = self.OPCdecode()
+
+        if self.tone > 0:
+            self.tone -= 1
+
+        if self.time > 0:
+            self.time -= 1
+        
+
+
+        self.opcode_asm.insert(0, asm)
+        self.opcode_asm.pop()
+
+
+        if TEST_VRAM or CONSOLE_DEBUG_SCREEN or CONSOLE_DEBUG_MSG:
+            print self
+
+        self.PC += 2
+    
+
+    def OPCdecode(self):
+        self.opcode = (self.memory[self.PC] << 8) | self.memory[self.PC + 1]
+
+        
+        self.X = ((self.opcode & 0x0F00) >> 8) & 0xF
+        self.Y = ((self.opcode & 0x00F0) >> 4) & 0xF
+        self.n = self.opcode & 0x000F
+        self.nn = self.opcode & 0x00FF
+        self.nnn = self.opcode & 0x0FFF
+
+        if CONSOLE_DEBUG_MSG:
+            print(' PC:' + str(hex(self.PC))),
+
+        self.opcode_lookup = {
+
+            # 0 based opcodes for Clear screen, RTS and Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
+            0x0000: self.op_CLS_RET_RCA_1802,
+            0x00E0: self.op_cls,                   # Clear VRAM
+            0x00EE: self.op_RTS,                   # Return From Subroutine
+
+            0x1000: self.op_JMP,                   # 1nnn JMP to nnn
+            # 2nnn call SUBroutine at nnn. STORE STACK[++SP] = PC & PC = nn
+            0x2000: self.op_SUB,
+
+            0x3000: self.op_SE_vx_nn,              # 3Xnn SKIP next if VX == nn
+            0x4000: self.op_SNE_vx_nn,             # 4Xnn SKIP next if VX != nn
+
+            0x5000: self.op_SE_vx_vy,              # 5Xnn SKIP next if VX == VY
+
+            0x6000: self.op_LD_vx_nn,              # 6Xnn    to VX load nn
+            0x7000: self.op_ADD_vx_nn,             # 7Xnn    to VX add nn
+
+            0x8000: self.op_LD_vx_vy,              # 8XY0    to VX load VY
+
+            # 8XY1    to VX load (VX or | VY)
+            0x8001: self.op_LD_vx_vx_or_vy,
+            # 8XY2    to VX load (VX and & VY)
+            0x8002: self.op_LD_vx_vx_and_vy,
+            # 8XY3    to VX load (VX xor ^ VY)
+            0x8003: self.op_LD_vx_vx_xor_vy,
+            # 8XY4    to VX add VY - if Carry , set  vF to 1, else 0
+            0x8004: self.op_LD_vx_vx_add_vy,
+            # 8XY5    to VX sub VY - VF is set to 0 when there's a borrow, and 1 when there isn't
+            0x8005: self.op_LD_vx_vx_sub_vy,
+            # 8XY6    shift VX right by 1.     VF is set to value of
+            0x8006: self.op_SHR_vx,
+            #         least significant bit of VX before the shift
+
+            # 8XY7    set VX to VY minus VX.
+            0x8007: self.op_SUBn_vx_vy,
+            #         VF is set to 0 when there's a borrow, and 1 when there isn't.
+
+            # 8XYE    Shifts VX left by one.
+            0x800E: self.op_SHL_vx,
+            #         VF is set to the value of the most significant bit of VX before the shift.
+
+            0x9000: self.op_SNE_vx_vy,             # 9XY0    skips next instruction if VX != VY
+
+
+            # Annn    ld I, nnn  - Annn - Sets I to the address nnn
+            0xA000: self.op_LOAD_I_nnn,
+
+            0xB000: self.op_JP_v0_nnn,              # Bnnn    JUMP to nnn + V0
+
+            # CXnn    VX = result of '&' on random number and NN
+            0xC000: self.op_RND_vx_nn,
+
+
+            0xD000: self.op_D_XYN,                  # Dxyn    DRAW
+
+            # Ex9E    skip next instruction if key stored in VX is pressed
+            0xE09E: self.op_SKP_vx,
+            # ExA1    skip next instruction if key stored in VX is NOT pressed
+            0xE0A1: self.op_SKNP_vx,
+
+
+            0xF007: self.op_LD_VX_dt,               # Fx07     VX = self.time
+
+            # Fx0A    Wait for a key press, store the value of the key in Vx.
+            0xF00A: self.op_LD_VX_n,
+            #         All execution stops until a key is pressed,
+            #         then the value of that key is stored in Vx
+
+            # Fx15     self.time = VX    - delay timer set to VX
+            0xF015: self.op_LD_dt_VX,
+            # Fx18     self.tune = VX    - sound timer set to VX
+            0xF018: self.op_LD_st_VX,
+            0xF01E: self.op_ADD_i_VX,               # Fx1E     to I add VX
+
+
+            # Fx29      Set I = location of sprite for digit Vx
+            0xF029: self.op_LD_f_VX,
+            #             The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx
+            # Fx33      store BCD representation of Vx in memory locations I, I+1, and I+2
+            0xF033: self.op_LD_b_VX,
+            #               The interpreter takes the decimal value of Vx, and places the hundreds digit in memory at location in I,
+            #               the tens digit at location I+1,
+            #               and the ones digit at location I+2
+
+            # Fx55        put registers V0 - Vx in memory at location I >
+            0xF055: self.op_LD_i_VX,
+
+            # Fx65        Fills V0 to VX (including VX) with values from memory starting at address I
+            #             fill V0 to VX with contents of mem[I]+
+
+            0xF065: self.
+
+        }
+
+        op_test = self.opcode & 0xF000
+
+        if op_test == 0xb000:
+            winsound.Beep(Freq, 50)
+
+        switch = {
+
+            0x0000: lambda: 0x0000 | self.opcode & 0xF0FF,
+
+            # important first F as a op type and last F as a op number
+            0x8000: lambda: 0x8000 | self.opcode & 0xF00F,
+            # like 0x8XY1
+            0xE000: lambda: 0xE000 | self.opcode & 0xF0FF,
+
+            # if op_code is like 0xFzzz then opcodec are 0xFX12,
+            0xF000: lambda: 0xF000 | self.opcode & 0xF0FF
+            # so make the OR with F0 and FF to clear the data at 0
+
+        }
+
+        if op_test in switch:
+            lookup = switch[op_test]()
+
+        else:
+            lookup = self.opcode & 0xF000
+
+        try:
+            self.opcode_lookup[lookup]()
+
+            return str(hex(self.opcode)) + '\t' + self.opc_mnemo
+        except KeyError:
+            return str(hex(self.opcode)) + ' Look up error'
+            pass
+
+    def op_CLS_RET_RCA_1802(self):
+
+        #self.PC = self.nnn
+        self.opc_mnemo = 'unused RCA 1802 ' + str(hex(self.opcode))
+
+    # 0x00E0                                clear screen
+
+    def op_cls(self):
+
+        for i in range(len(self.VRAM)):
+            self.VRAM[i] = 0
+
+        # pxarray[:,:] = (128,0,0)#CLS_BG
+        #pxarray[:,:] = CLS_BG
+        # clean only the "device" screen part - not the status area below
+
+        if PYGAME_DISPLAY:
+            pxarray[:display_width * screen_scale,
+                    :display_height * screen_scale] = CLS_BG
+
+        self.opc_mnemo = "CLS"
+
+    # 0x00EE                                return from a subroutine
+    def op_RTS(self):
+
+        self.SP -= 1
+        self.PC = self.stack[self.SP % 12]
+
+        self.opc_mnemo = "RTS"
+
+    # 0x1nnn                                jump to address NNN
+
+    def op_JMP(self):
+
+        self.PC = self.nnn
+
+        self.opc_mnemo = "JP " + str(hex(self.nnn))
+        self.PC -= 2                        # HAD TO REMOVE one cycle otherwise it jumped too far
+        # there is a single increment instruction in the main loop
+        # self.PC += 2
+        # so there is no need to repeat it in every other procedure
+
+    # 0x2nnn                                    call a SUBroutine at nnn. STORE STACK[++SP] = PC & PC = nnn
+    def op_SUB(self):                           # TODO check for ++self.SP % 12 - at BISKWIT
+
+        # increment stack pointer SP + 1 and put there current PC / program counter on the stack
+        self.stack[self.SP % 12] = self.PC
+        self.SP += 1
+
+        self.PC = self.nnn                      # new program counter PC
+        self.PC -= 2
+
+        self.opc_mnemo = "SUB ~ call " + str(hex(self.nnn))
+
+    # 3Xnn              skip the next instruction if VX == NN
+
+    def op_SE_vx_nn(self):
+        X = self.X
+
+        if self.nn == self.V[X]:
+            self.PC += 2
+
+        self.opc_mnemo = "SE V" + str(X) + ', ' + str(self.nn)
+
+    # 4Xnn                                 skip the next instruction if VX != NN
+
+    def op_SNE_vx_nn(self):
+        X = self.X
+
+        if self.V[X] != self.nn:
+            self.PC += 2
+
+        self.opc_mnemo = "SNE VX " + \
+            str(X) + ", " + str(hex(self.nn)) + " = nn"
+
+    # 5XY0                                  skip the next instruction if VX == VY
+
+    def op_SE_vx_vy(self):
+        X = self.X
+        Y = self.Y
+
+        if self.V[X] == self.V[Y]:
+            self.PC += 2
+
+        self.opc_mnemo = "SE V" + \
+            str(X) + " = " + str(hex(self.V[X])) + \
+            ", V" + str(Y) + " = " + str(hex(self.V[Y]))
+
+    # 6Xnn                                        LD set VX to NN
+
+    def op_LD_vx_nn(self):
+        X = self.X
+
+        self.V[X] = self.nn
+
+        self.opc_mnemo = "LD V" + str(X) + ", " + str(hex(self.nn))
+
+    # 7Xnn                                        to VX add nn
+
+    def op_ADD_vx_nn(self):
+        X = self.X
+
+        self.opc_mnemo = "ADD V" + \
+            str(X) + ", " + str(self.V[X]) + ", " + str(self.nn)
+
+        self.V[X] = (self.V[X] + self.nn) & 0xFF  # need to take care of BYTES
+        #self.V[X] = (self.V[X] + self.nn) % 256
+
+    # 8XY0                                           set to VX load VY
+
+    def op_LD_vx_vy(self):
+        X = self.X
+        Y = self.Y
+
+        self.V[X] = self.V[Y]
+
+        self.opc_mnemo = "LD V" + str(X) + ", " + "V" + str(Y)
+
+    # 8XY1                                            or vX,vY    VX = VX or VY
+    def op_LD_vx_vx_or_vy(self):
+        X = self.X
+        Y = self.Y
+
+        self.V[X] = (self.V[X] | self.V[Y]) & 0xFF  # byte
+
+        self.opc_mnemo = "or V" + str(X) + ", " + "V" + str(Y)
+
+    # 8XY2                                            to VX load (VX and & VY)
+
+    def op_LD_vx_vx_and_vy(self):
+        X = self.X
+        Y = self.Y
+
+        self.V[X] = (self.V[X] & self.V[Y]) & 0xFF      # byte
+
+        self.opc_mnemo = "and V" + str(X) + ", " + "V" + str(Y)
+
+    # 8XY3                                            to VX load (VX xor ^ VY)
+
+    def op_LD_vx_vx_xor_vy(self):
+        X = self.X
+        Y = self.Y
+
+        # byte       # xor vX,vY    VX = VX ^ VY
+        self.V[X] = (self.V[X] ^ self.V[Y]) & 0xFF
+
+        self.opc_mnemo = "xor V" + str(X) + ", " + "V" + str(Y)
+
+    # 8XY4                                        to VX add VY - if Carry , set  vF to 1, else 0
+
+    def op_LD_vx_vx_add_vy(self):
+        X = self.X
+        Y = self.Y
+
+        val = self.V[X] + self.V[Y]
+        if val > 255:
+            self.V[0xF] = 0x1  # (val >> 8) & 0xff
+        else:
+            self.V[0xF] = 0x0
+
+        self.V[X] = val & 0xFF
+        #self.V[X] %= 256
+
+        self.opc_mnemo = "add V" + \
+            str(X) + ", " + "V" + str(Y) + ' carry: ' + str(self.V[0xF])
+
+    # 8XY5                                        VX =  VX sub VY ; VF is set to 0 when there's a borrow, and 1 when there isn't
+
+    def op_LD_vx_vx_sub_vy(self):
+        X = self.X
+        Y = self.Y
+
+        val = self.V[X] - self.V[Y]
+
+        if self.V[X] > self.V[Y]:
+            self.V[0xF] = 0x1
+        else:
+            self.V[0xF] = 0x0
+
+        #self.V[X] = val % 256
+        self.V[X] = val & 0xFF              # take care of BYTES
+        # self.V[0xF] = (~(val >> 8)) & 0xFF
+        # something is not right here wven with ~
+
+        self.opc_mnemo = "sub V" + \
+            str(X) + ", " + "V" + str(Y) + ' carry: ' + str(self.V[0xF])
+
+    # 8XY7    set VX to VY minus VX.
+    #         VF is set to 0 when there's a borrow, and 1 when there isn't.
+
+    def op_SUBn_vx_vy(self):
+        X = self.X
+        Y = self.Y
+
+        val = self.V[Y] - self.V[X]
+
+        if self.V[Y] > self.V[X]:
+            self.V[0xF] = 0x1
+        else:
+            self.V[0xF] = 0x0
+
+        self.V[X] = val & 0xFF              # take care of BYTES
+
+        self.opc_mnemo = "subn V" + \
+            str(X) + ", " + "V" + str(Y) + ' VF borrow: ' + str(self.V[0xF])
+
+    # 8XY6                 shift VX right by 1.     VF is set to value of
+    #                      least significant bit of VX before the shift
+
+    def op_SHR_vx(self):
+        X = self.X
+        Y = self.Y
+
+        self.V[0xF] = self.V[X] & 0x01
+        self.V[X] = (self.V[X] >> 1) & 0xFF
+
+        self.opc_mnemo = "shr V" + str(X) + " >>1"
+
+    # 8XYE                shift VX left by one.
+    #                     VF is set to the value of the most significant bit of VX before the shift.
+    def op_SHL_vx(self):
+        X = self.X
+        Y = self.Y
+
+        self.V[0xF] = (self.V[X] >> 7) & 0x01
+        self.V[X] = (self.V[X] << 1) & 0xFF
+
+        self.opc_mnemo = "shl V" + str(X) + " <<1"
+
+    # 0x9000                9XY0    skips next instruction if VX != VY
+
+    def op_SNE_vx_vy(self):
+        X = self.X
+        Y = self.Y
+
+        if self.V[X] != self.V[Y]:
+            self.PC += 2
+
+        self.opc_mnemo = "SNE V" + \
+            str(X) + '('+str(hex(X)) + ')' + ", V" + \
+            str(Y) + '('+str(hex(Y)) + ')'
+
+    # Annn                            sets I to the address NNN.
+
+    def op_LOAD_I_nnn(self):
+
+        self.I = self.nnn
+
+        self.opc_mnemo = "LD I, " + str(hex(self.I))
+
+    # Bnnn                            JUMP to nnn + V0
+
+    def op_JP_v0_nnn(self):
+
+        self.PC = self.nnn + self.V[0]
+        self.PC -= 2
+
+        self.opc_mnemo = "JP V0 " + ", " + \
+            str(hex(self.PC)) + ' PC=(' + \
+            str(hex(self.V[0])) + ' + ' + str(hex(self.nnn)) + ')'
+
+    # 0xC000                            CXnn    VX = result of '&' on random number and NN
+
+    def op_RND_vx_nn(self):
+        X = self.X
+        nn = self.nn
+
+        self.V[X] = (randint(0, 255) & nn) & 0xFF  # byte
+        self.opc_mnemo = "rnd VX " + str(hex(X)) + ", " + str(hex(nn))
+
+
+# Dxyn    DRAW
+#    Display n-byte sprite starting at memory location I at (Vx, Vy),
+#    set VF = collision. The interpreter reads n bytes from memory,
+#    starting at the address stored in I.
+#    These bytes are then displayed as sprites on screen at coordinates (Vx, Vy).
+
+#    Sprites are XOR'd onto the existing screen.
+#    If this causes any pixels to be erased, VF is set to 1, otherwise it is set to 0.
+#    If the sprite is positioned so part of it is outside the coordinates of # the display,
+#    it wraps around to the opposite side of the screen
+
+    def op_D_XYN(self):                       # Dxyn    DRAW
+
+        X = self.V[self.X]
+        Y = self.V[self.Y]
+        n = self.n
+
+        self.V[0xF] = 0
+
+        for next_pix in range(n):
+            pixel = self.memory[self.I + next_pix]
+
+            for x_line in range(8):           # 8 bits per line
+                #x_coord = X % display_width + x_row * 8
+
+                x_pos = (X + x_line) % display_width
+                y_pos = (Y + next_pix) % display_height
+
+                sprite_bit = (pixel >> (7 - x_line)) & 1
+
+                bit_pos = y_pos * display_width + x_pos
+                VRAM_old = self.VRAM[bit_pos]
+
+                self.VRAM[bit_pos] = VRAM_old ^ sprite_bit
+
+                if VRAM_old != 0 and self.VRAM[bit_pos] == 0:
+                    self.V[0xF] = 1
+
+                new_x = x_pos * screen_scale
+                new_y = y_pos * screen_scale
+
+                if VRAM_old ^ sprite_bit:
+                    if PYGAME_DISPLAY:
+                        pxarray[new_x: new_x + screen_scale,
+                                new_y: new_y + screen_scale] = COL_FG
+                else:
+                    if self.V[0xF]:
+                        if PYGAME_DISPLAY:
+                            pxarray[new_x: new_x + screen_scale,
+                                    new_y: new_y + screen_scale] = CLS_BG
+
+
+#                if pixel & (0x80 >> x_line) != 0:
+#                     if self.VRAM[ X + x_line + (Y + y_line) * 64 ] == 1 :
+#                         self.V[0xF] = 1
+#                         self.VRAM[ X + x_line + (Y + y_line) * 64 ] ^= 1
+
+                #print X, Y
+
+        self.draw_flag = True
+
+        # theoretically in the VRAM
+
+        # if self.VRAM[ y_coord * display_width + x_coord ]
+        #self.VRAM[ y_coord * display_width + x_coord ] = 1
+
+        self.opc_mnemo = "DRW " + str(X) + ' ' + str(Y) + ' ' + str(n)
+
+    # 0xE09E                                    # Ex9E    skip next instruction if key stored in  VX  is pressed
+
+    def op_SKP_vx(self):
+        X = self.X
+
+        if self.KBOARD[self.V[X] & 0xF] == 1:
+            self.PC += 2
+
+        self.opc_mnemo = "SKP_vx"
+
+    # 0xE0A1                                    # ExA1    skip next instruction if key stored in  VX  is NOT pressed
+
+    def op_SKNP_vx(self):
+        X = self.X
+
+        if self.KBOARD[self.V[X] & 0xF] != 1:
+            self.PC += 2
+
+        self.opc_mnemo = "SKNP_vx"
+
+    # Fx07                                            VX = self.time
+    # DELAY TIMER to VX
+
+    def op_LD_VX_dt(self):
+        X = self.X
+        self.V[X] = self.time
+
+        self.opc_mnemo = "LD V" + str(X) + ', ' + str(self.time)
+
+    # 0xF00A                                    Fx0A    Wait for a key press, store the value of the key in Vx.
+        #       All execution stops until a key is pressed,
+        #       then the value of that key is stored in Vx
+
+    def op_LD_VX_n(self):
+        X = self.X
+
+        if key_down:
+            self.KBOARD[KEY_MAP[key_down]] = 1      #
+            # the NEEDED signal comes from the keyboard pressed
+            self.V[X] = KEY_MAP[key_down]
+        else:
+            self.PC -= 2
+
+    # Fx18                                          self.tone = VX    - sound timer set to VX
+    # VX to SOUND TIMER
+
+    def op_LD_st_VX(self):
+        X = self.X
+
+        self.tone = self.V[X]
+        self.opc_mnemo = "LD st, V" + str(X) + " (" + str(hex(self.V[X])) + ")"
+
+    # VX to DELAY TIMER
+    # Fx15    self.time = VX    - delay timer set to VX
+
+    def op_LD_dt_VX(self):
+        X = self.X
+
+        self.time = self.V[X]
+        self.opc_mnemo = "LD dt, V" + str(X) + " (" + str(hex(self.V[X])) + ")"
+
+    # I + VX
+    # Fx1E      to I add VX
+
+    def op_ADD_i_VX(self):
+        X = self.X
+
+        self.I = (self.I & 0xFFF) + self.V[X]
+        self.V[0xF] = self.I >> 12
+
+        self.opc_mnemo = "ADD I, V" + str(X) + ', ' + str(hex(self.V[X]))
+
+    # Fx29                                      Set I = location of sprite for digit Vx
+
+    def op_LD_f_VX(self):
+        X = self.X
+        #    & 0xFF may be unnecessary - just checking
+        # The value of I is set to the location
+        self.I = (self.V[X] & 0xFF) * 5
+        #    for the hexadecimal sprite
+        #    corresponding to the value of Vx
+        self.opc_mnemo = "LD f, V" + str(X) + ' (' + (str(self.I)) + ')'
+
+    # Fx33
+    # BCD representation of Vx put to I (hundreds), I+1 (tens) and I+2 (ones)
+
+    def op_LD_b_VX(self):
+        X = self.X
+        VX = self.V[X]
+
+        self.memory[self.I & 0xFFF] = ((VX / 100) % 10) & 0xFF
+        self.memory[(self.I + 1) & 0xFFF] = ((VX / 10) % 10) & 0xFF
+        self.memory[(self.I + 2) & 0xFFF] = ((VX / 1) % 10) & 0xFF
+
+        self.opc_mnemo = "LD B, V" + str(X) + ' (' + (str(hex(VX))) + ')'
+
+    # Fx55
+    # V0 to VX put at mem[I]
+
+    def op_LD_i_VX(self):
+        X = self.X
+
+        self.opc_mnemo = 'LD memI[' + \
+            str(hex(self.I)) + ']+' + ", V 0-" + str(hex(X))
+
+        for i in range(X + 1):
+            self.memory[(self.I + i) & 0xFFF] = self.V[i]
+
+    # Fx65                                        Fills V0 to VX (including VX) with values from memory starting at address I
+    #                                             fill V0 to VX with contents of mem[I]+
+
+    def op_LD_VX_i(self):
+        X = self.X
+
+        self.opc_mnemo = "LD V 0-" + \
+            str(hex(X)) + ', memI[' + str(hex(self.I)) + ']+'
+
+        for i in range(X + 1):
+            self.V[i] = self.memory[(self.I + i) & 0xFFF]
