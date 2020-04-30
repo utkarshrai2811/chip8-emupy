@@ -172,7 +172,7 @@ class chip8CPU(object):
                         0xF0, 0x80, 0xF0, 0x80, 0x80]
 
     def initialise(self):
-        logger.warn('chip8 CPU initialize')
+        logger.warning('chip8 CPU initialize')
 
         seed()
 
@@ -203,7 +203,7 @@ class chip8CPU(object):
 
         self.memory[:80] = bytearray(self.fontset)
 
-        logger.warn('chip8 CPU Fonts Loaded...')
+        logger.warning('chip8 CPU Fonts Loaded...')
 
 
         self.time = 0
@@ -216,7 +216,7 @@ class chip8CPU(object):
         self.cycle_num = 0
 
     def ROMload(self, filename=''):    
-        logger.warn('chip8 CPU ROM REGISTERS set...')
+        logger.warning('chip8 CPU ROM REGISTERS set...')
 
         fhand = open(filename, 'rb')
         ROMfile = fhand.read()
