@@ -88,11 +88,11 @@ REGISTERS_NUM = 0x10
 
 
 
-CLS_BG = (128, 128, 128)
-COL_FG = (160, 255, 160)
+# CLS_BG = (128, 128, 128)
+# COL_FG = (160, 255, 160)
 
-CLS_BG = (100, 200, 100)
-COL_FG = (64, 64, 64)
+CLS_BG = (0, 0, 0)
+COL_FG = (255, 255, 255)
 
 KEY_MAP = {
     pygame.K_KP0: 0x0,
